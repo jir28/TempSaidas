@@ -5,7 +5,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('SemBlindagem.JPG', '.'), ('ComBlindagem.JPG', '.'), ('mexico.png', '.'), ('brasil.png', '.')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

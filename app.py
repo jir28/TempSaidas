@@ -1,9 +1,14 @@
+import sys
+import win32clipboard
 import customtkinter as ctk
 from PIL import Image, ImageGrab
 from customtkinter import CTkImage
+import json
+import os
+from datetime import datetime
+from PIL import ImageGrab, Image
+import subprocess
 import io
-import win32clipboard
-
 
 #CONFIGURACIÓN INICIAL
 ctk.set_appearance_mode("light")
@@ -11,7 +16,7 @@ ctk.set_default_color_theme("blue")
 
 app = ctk.CTk()
 app.title("Cálculo de Temperatura de Salidas")
-app.geometry("680x920")
+app.geometry("680x960")
 
 #CARGA DE IMÁGENES
 img_sem = CTkImage(Image.open("SemBlindagem.JPG"), size=(300, 240))
@@ -74,6 +79,10 @@ texts = {
         "error": "⚠️ Verifique as entradas"
     }
 }
+
+HISTORIAL_FILE = "historial.json"
+historial_calculos = []
+
 
 #Funciones
 
@@ -187,17 +196,49 @@ def calcular():
     except ValueError:
         msg_label.configure(text=texts[lang]["error"], text_color="orange")
 
+    # Guardar en historial
+    entrada = {
+        "A": A, "B": B, "S": S, "L": L, "ST": ST, "J": J, "TA": TA, "TTO" : TTO, "Temp. Total": TTotal,
+        "Disposición": dispo_var.get(),
+        "Material": mat_menu.get(),
+        "Aceite": oil_menu.get(),
+        "Aislamiento": aislamiento,
+        "CTC": transposto_var.get(),
+        "Blindado": blindado,
+        "DividirB": divb,
+        "ÁreaCond": round(SDisCond, 2),
+        "ÁreaConv": round(SDisConv, 2),
+        "Pérdidas": round(PerdaSaida, 2),
+        "PerdArea": f"{PerdaPorAreaCond:.4f} + {PerdaPorAreaConv:.4f}",
+        "DeltaT": round(DeltaT, 2),
+        "TTotal": round(TTotal, 2)
+    }
+    #historial_calculos.append(entrada)
+    guardar_historial(entrada)
 
-def capturar_y_copiar():
+
+def capturar_y_guardar(app):
+    carpeta_capturas = os.path.join(os.getcwd(), "capturas")
+    os.makedirs(carpeta_capturas, exist_ok=True)
+
+    # Nombre y ruta del archivo
+    nombre_archivo = f"captura_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    ruta_archivo = os.path.join(carpeta_capturas, nombre_archivo)
+
     x = app.winfo_rootx()
     y = app.winfo_rooty()
-    w = app.winfo_width()
-    h = app.winfo_height()
-    img = ImageGrab.grab(bbox=(x, y, x + w, y + h))
+    w = x + app.winfo_width()
+    h = y + app.winfo_height()
+
+    # Capturar y guardar
+    imagen = ImageGrab.grab(bbox=(x, y, w, h))
+    imagen.save(ruta_archivo, "JPEG")
+
     output = io.BytesIO()
-    img.convert("RGB").save(output, "JPG")
+    imagen.convert("RGB").save(output, "BMP")
     data = output.getvalue()[14:]
     output.close()
+
     win32clipboard.OpenClipboard()
     win32clipboard.EmptyClipboard()
     win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
@@ -216,6 +257,42 @@ def actualizar_imagen(*args):
         img_label.configure(image=img_sem)
         divb_check.grid_remove()
 
+
+def guardar_historial(entrada):
+    global historial_calculos
+
+    historial_calculos.append(entrada)
+    if len(historial_calculos) > 10:
+        historial_calculos = historial_calculos[-10:]
+
+    with open("historial.json", "w") as f:
+        json.dump(historial_calculos, f, indent=4)
+
+def cargar_historial():
+    global historial_calculos
+    if os.path.exists(HISTORIAL_FILE):
+        with open(HISTORIAL_FILE, "r", encoding="utf-8") as f:
+            historial_calculos = json.load(f)
+
+def mostrar_historial():
+    if not historial_calculos:
+        return
+
+    ventana = ctk.CTkToplevel(app)
+    ventana.title("Historial de Cálculos")
+    ventana.geometry("800x500")
+
+    frame_tabla = ctk.CTkScrollableFrame(ventana, width=780, height=460)
+    frame_tabla.pack(padx=10, pady=10)
+
+    encabezados = ["A", "B", "S", "L", "ST", "J", "TA", "TTO", "TTotal"]
+    for j, h in enumerate(encabezados):
+        ctk.CTkLabel(frame_tabla, text=h, font=("Arial", 12, "bold")).grid(row=0, column=j, padx=5, pady=5)
+
+    for i, entrada in enumerate(historial_calculos[-10:], start=1):  # Últimos 10
+        for j, key in enumerate(encabezados):
+            val = entrada.get(key, "---")
+            ctk.CTkLabel(frame_tabla, text=str(val), font=("Arial", 11)).grid(row=i, column=j, padx=5, pady=3)
 
 
 # INTERFAZ
@@ -267,7 +344,7 @@ divb_check.grid_remove()
 calc_btn = ctk.CTkButton(app, text="Calcular", command=calcular)
 calc_btn.pack(pady=15)
 
-# Selector de idioma (botón de imagen)
+# idioma boton
 lang_btn = ctk.CTkButton(app, image=flag_mex, width=24, height=24, text="", command=cambiar_idioma, fg_color="transparent")
 lang_btn.place(x=10, y=10)
 
@@ -286,9 +363,15 @@ for i, label in enumerate(texts["es"]["result"]):
     result.grid(row=i, column=1, padx=5, pady=3, sticky="w")
     result_labels[label] = result
 
-shot_btn = ctk.CTkButton(app, text="Screenshot", command=capturar_y_copiar)
+
+shot_btn = ctk.CTkButton(app, text="Screenshot", command=lambda: capturar_y_guardar(app))
 shot_btn.pack(pady=10)
 
+hist_btn = ctk.CTkButton(app, text="Historial", command=mostrar_historial)
+hist_btn.pack(pady=10)
+
+
+cargar_historial()
 actualizar_imagen()
 actualizar_textos()
 app.mainloop()
