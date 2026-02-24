@@ -7,7 +7,6 @@ import json
 import os
 from datetime import datetime
 from PIL import ImageGrab, Image
-import subprocess
 import io
 
 #CONFIGURACIÓN INICIAL
@@ -295,7 +294,6 @@ def mostrar_historial():
             ctk.CTkLabel(frame_tabla, text=str(val), font=("Arial", 11)).grid(row=i, column=j, padx=5, pady=3)
 
 
-# INTERFAZ
 entrada_frame = ctk.CTkFrame(app)
 entrada_frame.pack(pady=10)
 
@@ -305,7 +303,6 @@ for i, label in enumerate(texts["es"]["labels"]):
     entry.grid(row=i, column=1, padx=5, pady=3)
     inputs[label] = entry
 
-# Opciones
 dispo_label = ctk.CTkLabel(entrada_frame, text="Disposición:")
 dispo_label.grid(row=0, column=2, padx=5, pady=3, sticky="e")
 dispo_var = ctk.StringVar(value="Vertical")
